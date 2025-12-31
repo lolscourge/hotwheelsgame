@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>HOT WHEELS: OVERDRIVE v12.0 (RECONNECT)</title>
+    <script src="https://unpkg.com/peerjs@1.5.1/dist/peerjs.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Chakra+Petch:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* --- VISUAL IDENTITY --- */
+        :root {
+            --neon-orange: #ff5e00;
+            --neon-blue: #00f3ff;
+            --neon-green: #0aff0a;
+            --neon-red: #ff003c;
+            --neon-gold: #ffd700;
+            --dark-bg: #0b0b0b;
+            --card-bg: #1a1a1a;
+            --font-head: 'Orbitron', sans-serif;
+            --font-body: 'Chakra Petch', sans-serif;
+        }
+
+        * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
+        
+        body {
+            background-color: var(--dark-bg);
+            background-image: radial-gradient(circle at 50% 50%, #151515 0%, #050505 100%);
+            color: white;
+            font-family: var(--font-body);
+            margin: 0; height: 100vh;
+            display: flex; flex-direction: column; overflow: hidden;
+        }
+
+        /* --- UI ELEMENTS --- */
+        .screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: opacity 0.3s ease; opacity: 1; padding: 20px; overflow-y: auto; z-index: 10;
+        }
+        .hidden { opacity: 0; pointer-events: none; z-index: -1; position: absolute; }
+
+        h1, h2, h3 { 
+            font-family: var(--font-head); text-transform: uppercase; margin: 0; 
+            letter-spacing: 2px;
+        }
+        
+        .text-orange { color: var(--neon-orange); }
+        .text-blue { color: var(--neon-blue); }
+        .text-red { color: var(--neon-red); }
+        .text-green { color: var(--neon-green); }
+        .text-gold { color: var(--neon-gold); }
+
+        .btn-main {
+            background: var(--neon-orange);
+            color: black; border: none;
+            padding: 18px; font-family: var(--font-head); font-weight: 900; font-size: 1.1rem;
+            text-transform: uppercase; letter-spacing: 1px;
+            cursor: pointer; margin: 10px 0; width: 100%; max-width: 350px;
+            border-radius: 8px; box-shadow: 0 4px 15px rgba(255, 94, 0, 0.4);
+            transition: transform 0.1s;
+        }
+        .btn-main:active { transform: scale(0.96); }
+        .btn-main:disabled { filter: grayscale(1); opacity: 0.5; background: #555; box-shadow: none; color: #999; }
+        .btn-secondary { background: #333; color: white; box-shadow: none; border: 1px solid #555; }
+        .btn-rejoin { background: var(--neon-blue); color: black; box-shadow: 0 4px 15px rgba(0, 243, 255, 0.4); }
+        
+        .input-box {
+            background: #222; border: 2px solid #444; color: white;
+            font-family: var(--font-head); font-size: 1.5rem; text-align: center;
+            width: 100%; max-width: 300px; padding: 15px; border-radius: 8px;
+            margin: 10px 0; outline: none; text-transform: uppercase;
+        }
+        .input-box:focus { border-color: var(--neon-blue); }
+
+        /* --- SPEEDOMETER UI --- */
+        .speed-grid {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+            width: 100%; max-width: 400px; margin: 20px 0;
+        }
+        .speed-btn {
+            background: #222; border: 2px solid #333; color: #666;
+            padding: 15px 0; font-family: var(--font-head); font-size: 1.5rem; font-weight: bold;
+            border-radius: 8px; cursor: pointer; text-align: center;
+            transition: all 0.2s; position: relative;
+        }
+        .speed-btn .coin-badge {
+            position: absolute; top: -5px; right: -5px; font-size: 0.6rem; 
+            background: var(--neon-gold); color: black; padding: 2px 4px; border-radius: 4px;
+        }
+        .speed-btn .risk-badge {
+            position: absolute; bottom: -5px; left: 50%; transform: translateX(-50%); font-size: 0.6rem; 
+            background: #333; color: white; padding: 2px 6px; border-radius: 4px; white-space: nowrap;
+            border: 1px solid #555;
+        }
+        
+        .speed-btn[data-val="1"], .speed-btn[data-val="2"], .speed-btn[data-val="3"] { border-color: #0aff0a; color: #0aff0a; opacity: 0.8; }
+        .speed-btn[data-val="4"], .speed-btn[data-val="5"], .speed-btn[data-val="6"] { border-color: #ffe600; color: #ffe600; opacity: 0.8; }
+        .speed-btn[data-val="7"], .speed-btn[data-val="8"] { border-color: #ff003c; color: #ff003c; opacity: 0.8; }
+        .speed-btn.selected { background: white; color: black !important; opacity: 1; transform: scale(1.05); box-shadow: 0 0 15px currentColor; }
+
+        /* --- CARDS & PANELS --- */
+        .panel {
+            background: var(--card-bg); padding: 15px; border-radius: 10px;
+            width: 100%; max-width: 400px; margin-bottom: 15px;
+            border: 1px solid #333; text-align: center;
+        }
+
+        .role-badge {
+            background: #111; border: 1px solid #444; padding: 10px;
+            border-radius: 8px; width: 100%; margin-bottom: 15px;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .role-icon { font-size: 1.5rem; margin-right: 10px; }
+        .role-text { text-align: left; font-size: 0.85rem; line-height: 1.3; color: #ccc; }
+
+        .shop-item {
+            display: flex; justify-content: space-between; align-items: center;
+            background: #252525; padding: 15px; margin-bottom: 10px;
+            border-radius: 8px; border: 1px solid #444; cursor: pointer;
+        }
+        .shop-item:active { background: #333; }
+
+        /* --- HOST SPECIFIC --- */
+        .player-card { 
+            background: #222; padding: 10px; margin: 5px; border-radius: 5px;
+            border-left: 4px solid #555; width: 150px; text-align: left;
+            position: relative; overflow: hidden;
+        }
+        .player-card.locked { border-left-color: var(--neon-green); background: #152515; }
+
+        .big-stat { font-size: 4rem; font-weight: 900; line-height: 1; margin: 10px 0; }
+
+        /* Leaderboard Table */
+        .lb-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.8rem; }
+        .lb-table td { padding: 10px; border-bottom: 1px solid #333; text-align: center; }
+        .lb-table th { text-align: center; color: #666; font-size: 0.7rem; border-bottom: 1px solid #555; padding-bottom: 5px; }
+        .lb-rank { font-family: var(--font-head); color: white; font-size: 1.1rem; width: 50px; }
+        .lb-name { text-align: left !important; font-weight: bold; color: var(--neon-blue); }
+        .lb-mods { font-size: 0.7rem; color: #888; font-style: italic; max-width: 120px; }
+        .lb-row-crash { color: var(--neon-red); opacity: 0.8; }
+        .lb-row-win { color: var(--neon-green); }
+        
+        .rank-1 { color: var(--neon-gold); text-shadow: 0 0 10px var(--neon-gold); }
+        .rank-2 { color: #c0c0c0; }
+        .rank-3 { color: #cd7f32; }
+
+        /* Radar UI */
+        .radar-box {
+            display: flex; justify-content: space-around; margin-top: 10px;
+            background: #000; padding: 10px; border: 1px solid #333;
+        }
+        .radar-col { text-align: center; }
+        .radar-num { font-size: 1.5rem; font-family: var(--font-head); }
+
+        /* --- MODALS --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 100;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            padding: 20px;
+        }
+        .reaction-btn {
+            background: #222; border: 1px solid #555; color: white;
+            padding: 20px; width: 100%; margin: 5px 0; border-radius: 8px;
+            text-align: left; display: flex; align-items: center;
+        }
+    </style>
+</head>
+<body onload="checkRejoin()">
+
+    <div id="setup-screen" class="screen" style="z-index: 50;">
+        <h1 style="font-size: 2.5rem; margin-bottom: 5px;">
+            <span class="text-orange">HOT</span>WHEELS
+        </h1>
+        <p style="color: #666; margin-bottom: 40px;">OVERDRIVE v12.0 // RECONNECT</p>
+        
+        <button id="btn-rejoin" class="btn-main btn-rejoin hidden" onclick="rejoinGame()">
+            REJOIN ROOM <span id="rejoin-code"></span>
+        </button>
+
+        <button class="btn-main" onclick="initHost()">Start Host</button>
+        <button class="btn-main btn-secondary" onclick="showJoinScreen()">Join Game</button>
+    </div>
+
+    <div id="host-screen" class="screen hidden" style="justify-content: flex-start;">
+        <div style="width: 100%; display: flex; justify-content: space-between; border-bottom: 1px solid #333; padding-bottom: 15px; margin-bottom: 20px;">
+            <div>
+                <div style="font-size: 0.8rem; color: #666;">ROOM CODE</div>
+                <div id="room-code-display" class="text-blue" style="font-size: 2rem; font-family: var(--font-head);">...</div>
+            </div>
+            <div style="text-align: right;">
+                <div style="font-size: 0.8rem; color: #666;">WEATHER</div>
+                <div id="host-weather-display" class="text-orange" style="font-size: 1.5rem; font-family: var(--font-head);">CLEAR</div>
+            </div>
+        </div>
+
+        <div id="host-phase-display" style="text-align: center; margin-bottom: 20px; width: 100%; max-width: 800px;">
+            <h2 id="round-display">LOBBY</h2>
+            <p id="phase-status" style="color: #888;">WAITING FOR DRIVERS...</p>
+            
+            <div id="leaderboard-container" class="hidden" style="background: #151515; padding: 15px; border-radius: 8px; margin-top: 20px;">
+                <h3 class="text-orange">MISSION REPORT</h3>
+                <div id="limit-report" style="color: #666; font-size: 0.8rem; margin-bottom: 10px;"></div>
+                <table class="lb-table">
+                    <thead><tr><th style="width:50px;">POS</th><th class="lb-name">DRIVER</th><th>SPD</th><th>MODS</th><th>$$$</th><th>PTS</th></tr></thead>
+                    <tbody id="lb-body"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="player-list" style="display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; width: 100%;"></div>
+
+        <div style="flex-grow: 1;"></div>
+        
+        <button class="btn-main" id="btn-host-action" onclick="hostNextPhase()" disabled>START GAME</button>
+    </div>
+
+    <div id="join-screen" class="screen hidden">
+        <h2>DRIVER SETUP</h2>
+        <input type="text" id="join-code" class="input-box" placeholder="ROOM CODE" maxlength="4">
+        <input type="text" id="join-name" class="input-box" placeholder="YOUR NAME" maxlength="8">
+        
+        <h3 style="margin-top: 20px; font-size: 1rem; color: #888;">SELECT CLASS</h3>
+        <div id="role-select" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; max-width: 400px; margin-top: 10px;"></div>
+        
+        <button class="btn-main" onclick="connectToHost()" style="margin-top: 20px;">JOIN RACE</button>
+        <button class="btn-secondary" onclick="switchScreen('setup-screen')" style="margin-top: 10px; width:100%; padding: 15px; max-width:350px;">BACK</button>
+    </div>
+
+    <div id="client-lobby" class="screen hidden">
+        <h2 class="text-orange" id="lobby-status">STANDBY</h2>
+        <div id="lobby-msg" style="margin-bottom: 20px; color: #888;">Waiting for host...</div>
+        
+        <div class="panel">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                <span>CREDITS</span>
+                <span id="credit-display" class="text-gold">$75</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+                <span>INVENTORY</span>
+                <span id="inv-display" class="text-blue">EMPTY</span>
+            </div>
+        </div>
+
+        <div id="shop-area" class="hidden" style="width: 100%; max-width: 400px;">
+            <h3 class="text-blue" style="margin-bottom: 10px;">PICK 1 UPGRADE</h3>
+            <div id="shop-options"></div>
+            <button class="btn-secondary" style="width: 100%; padding: 15px; margin-top: 10px;" onclick="skipShop()">SKIP</button>
+        </div>
+    </div>
+
+    <div id="client-game" class="screen hidden">
+        <div style="width: 100%; display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 0.8rem; color: #666;">
+            <div id="forecast-display" class="text-orange">WEATHER: ?</div>
+            <div id="cockpit-credits" class="text-gold">$75</div>
+        </div>
+
+        <div id="active-role-card" class="role-badge"></div>
+
+        <div class="panel" style="border-color: #333;">
+            <div style="font-size: 0.8rem; color: #888; margin-bottom: 5px;">TARGET SPEED</div>
+            <div id="speed-display" class="big-stat text-green">0</div>
+            <div id="risk-text" style="font-size: 0.9rem; color: #0aff0a; height: 20px;">SELECT SPEED</div>
+            
+            <div class="speed-grid">
+                <div class="speed-btn" onclick="setSpeed(1)" data-val="1">1 <span class="coin-badge">+$75</span> <span id="risk-1" class="risk-badge">0%</span></div>
+                <div class="speed-btn" onclick="setSpeed(2)" data-val="2">2 <span class="coin-badge">+$75</span> <span id="risk-2" class="risk-badge">0%</span></div>
+                <div class="speed-btn" onclick="setSpeed(3)" data-val="3">3 <span class="coin-badge">+$75</span> <span id="risk-3" class="risk-badge">0%</span></div>
+                <div class="speed-btn" onclick="setSpeed(4)" data-val="4">4 <span class="coin-badge">+$25</span> <span id="risk-4" class="risk-badge">15%</span></div>
+                <div class="speed-btn" onclick="setSpeed(5)" data-val="5">5 <span class="coin-badge">+$25</span> <span id="risk-5" class="risk-badge">15%</span></div>
+                <div class="speed-btn" onclick="setSpeed(6)" data-val="6">6 <span class="coin-badge">+$25</span> <span id="risk-6" class="risk-badge">15%</span></div>
+                <div class="speed-btn" onclick="setSpeed(7)" data-val="7">7 <span id="risk-7" class="risk-badge">25%</span></div>
+                <div class="speed-btn" onclick="setSpeed(8)" data-val="8">8 <span id="risk-8" class="risk-badge">25%</span></div>
+            </div>
+        </div>
+
+        <div id="cop-radar-panel" class="panel hidden" style="border-color: var(--neon-blue);">
+            <div class="text-blue" style="font-size: 0.8rem;">POLICE RADAR (LIVE)</div>
+            <div class="radar-box">
+                <div class="radar-col"><div id="radar-safe" class="radar-num text-green">0</div><small>SAFE</small></div>
+                <div class="radar-col"><div id="radar-mid" class="radar-num text-yellow">0</div><small>MID</small></div>
+                <div class="radar-col"><div id="radar-high" class="radar-num text-red">0</div><small>HIGH</small></div>
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; width: 100%; max-width: 400px;">
+            <button id="btn-item" class="btn-secondary" style="flex: 1; padding: 15px;" onclick="toggleItemMenu()">ITEM: NONE</button>
+        </div>
+
+        <button class="btn-main" onclick="commitMove()" style="margin-top: 20px;">LOCK IN</button>
+    </div>
+
+    <div id="client-result" class="screen hidden" style="text-align: center;">
+        <h1 id="res-outcome" style="font-size: 4rem; margin-bottom: 10px;">SAFE</h1>
+        <div id="res-score" class="text-green" style="font-size: 2rem; margin-bottom: 5px;">+100 PTS</div>
+        <div id="res-cash" class="text-gold" style="font-size: 1.5rem; margin-bottom: 20px;">+$0 CASH</div>
+        <p id="res-detail" style="color: #888; max-width: 300px; margin-bottom: 30px;"></p>
+        <button class="btn-main" onclick="backToLobby()">CONTINUE</button>
+    </div>
+
+    <div id="overlay-item" class="modal-overlay hidden">
+        <h2 class="text-blue">USE ITEM</h2>
+        <div id="item-list" style="width: 100%; max-width: 350px; margin-top: 20px;"></div>
+        <button class="btn-secondary" style="width:100%; padding:15px; margin-top:10px; max-width:350px;" onclick="closeOverlays()">CANCEL</button>
+    </div>
+
+    <script>
+        /* --- CONFIGURATION --- */
+        const APP_ID = "hw-v12-recon-";
+        
+        const ROLES = {
+            'RACE': { name: 'SPEEDSTER', icon: '🏎️', desc: 'Survival Score Doubled if Speed is 8.' },
+            'TANK': { name: 'TANK', icon: '🛡️', desc: 'Armor saves you from one Crash.' },
+            'DARE': { name: 'DAREDEVIL', icon: '🔥', desc: 'Bonus if you survive a >40% Risk roll.' },
+            'MECH': { name: 'TUNER', icon: '🔧', desc: '-15% Crash Risk on all speeds.' },
+            'COP':  { name: 'ENFORCER', icon: '🚨', desc: 'See LIVE radar of opponents speeds.' }
+        };
+
+        const ITEMS = {
+            'NOS': { name: 'NOS BOTTLE', desc: '+2 Speed (Keeps Original Risk)', icon: '⚡' },
+            'ABS': { name: 'ABS BRAKES', desc: '-30% Crash Risk (Keeps Speed)', icon: '🛑' },
+            'OIL': { name: 'OIL SLICK', desc: '-2 Speed to RANDOM opponent', icon: '💧' },
+            'INS': { name: 'INSURANCE', desc: 'Get paid if you crash', icon: '📝' }
+        };
+
+        const WEATHERS = {
+            'SUNNY': { name: 'CLEAR SKIES', color: '#ffeb3b', risks: [0, 1, 2, 5, 10, 20, 35, 60] },
+            'RAIN':  { name: 'LIGHT RAIN',  color: '#4fc3f7', risks: [2, 5, 10, 20, 30, 45, 65, 85] },
+            'STORM': { name: 'HEAVY STORM', color: '#7b1fa2', risks: [5, 15, 25, 40, 55, 75, 90, 99] },
+            'FOG':   { name: 'THICK FOG',   color: '#cfd8dc', risks: [0, 5, 15, 25, 35, 50, 70, 90] },
+            'ICE':   { name: 'BLACK ICE',   color: '#00bcd4', risks: [10, 15, 20, 30, 40, 60, 80, 100] }
+        };
+
+        /* --- STATE --- */
+        let peer, conn;
+        let myRole = null;
+        let myCredits = 75;
+        let myInventory = [];
+        let mySavedId = null; // For reconnection
+        
+        let players = {};
+        let round = 0;
+        let phase = 'LOBBY'; 
+        let currentWeather = null;
+
+        const Audio = {
+            ctx: null,
+            init: function() { if(!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); },
+            beep: function(freq=440, type='sine') {
+                if(!this.ctx) return;
+                const o = this.ctx.createOscillator();
+                const g = this.ctx.createGain();
+                o.frequency.value = freq; o.type = type;
+                g.gain.value = 0.1; g.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.1);
+                o.connect(g); g.connect(this.ctx.destination);
+                o.start(); o.stop(this.ctx.currentTime + 0.1);
+            }
+        };
+
+        /* --- HOST LOGIC --- */
+        function initHost() {
+            Audio.init();
+            const code = Math.random().toString(36).substring(2, 6).toUpperCase();
+            document.getElementById('room-code-display').innerText = code;
+            switchScreen('host-screen');
+            peer = new Peer(APP_ID + code);
+            peer.on('connection', c => {
+                c.on('data', d => handleHostData(c, d));
+            });
+            updateHostUI();
+        }
+
+        function handleHostData(c, data) {
+            if (data.type === 'JOIN') {
+                // RECONNECTION LOGIC:
+                if (players[data.id]) {
+                    // Player exists! Update connection but KEEP stats
+                    players[data.id].conn = c;
+                    players[data.id].name = data.name; // Update name just in case
+                    console.log(`Player ${data.name} reconnected.`);
+                    
+                    // Send them the current state
+                    c.send({ 
+                        type: 'WELCOME', 
+                        role: ROLES[players[data.id].role],
+                        isReconnect: true,
+                        credits: players[data.id].credits,
+                        inventory: players[data.id].inventory
+                    });
+                } else {
+                    // New Player
+                    players[data.id] = { 
+                        conn: c, 
+                        id: data.id, 
+                        name: data.name, 
+                        role: data.role, 
+                        score: 0, 
+                        credits: 75, 
+                        inventory: [], 
+                        locked: false, 
+                        speed: 0, 
+                        item: null 
+                    };
+                    c.send({ type: 'WELCOME', role: ROLES[data.role], isReconnect: false });
+                }
+                updateHostUI();
+            }
+            
+            if (data.type === 'LOCK') {
+                let p = players[data.id];
+                if(p) {
+                    p.speed = parseInt(data.speed);
+                    p.item = data.item;
+                    p.locked = true;
+                    updateHostUI();
+                    broadcastRadar();
+                    if(Object.values(players).every(pl => pl.locked)) setTimeout(hostNextPhase, 500); 
+                }
+            }
+            if (data.type === 'SHOP_DONE') {
+                if(players[data.id]) {
+                    players[data.id].inventory = data.inventory;
+                    players[data.id].credits = data.credits;
+                    players[data.id].shopReady = true;
+                }
+                if(Object.values(players).every(pl => pl.shopReady)) setTimeout(hostNextPhase, 500);
+            }
+        }
+
+        function broadcastRadar() {
+            let counts = { SAFE: 0, MID: 0, HIGH: 0 };
+            Object.values(players).forEach(p => {
+                if(p.locked) {
+                    if(p.speed <= 3) counts.SAFE++;
+                    else if(p.speed <= 6) counts.MID++;
+                    else counts.HIGH++;
+                }
+            });
+            Object.values(players).forEach(p => {
+                if(p.role === 'COP') p.conn.send({ type: 'RADAR_UPDATE', counts: counts });
+            });
+        }
+
+        function updateHostUI() {
+            const list = document.getElementById('player-list');
+            if(phase !== 'RESULT') {
+                list.classList.remove('hidden');
+                document.getElementById('leaderboard-container').classList.add('hidden');
+                list.innerHTML = '';
+                Object.values(players).forEach(p => {
+                    const card = document.createElement('div');
+                    card.className = `player-card ${p.locked ? 'locked' : ''}`;
+                    card.innerHTML = `<span class="text-blue">${p.name}</span><br><span style="font-size:0.8rem">${ROLES[p.role].name}</span><br><span class="text-gold">$${p.credits}</span> | PTS: ${p.score}`;
+                    list.appendChild(card);
+                });
+            } else {
+                list.classList.add('hidden');
+            }
+            if (phase === 'LOBBY' && Object.keys(players).length > 0) document.getElementById('btn-host-action').disabled = false;
+        }
+
+        function hostNextPhase() {
+            const btn = document.getElementById('btn-host-action');
+            if (phase === 'LOBBY' || phase === 'RESULT') {
+                phase = 'SHOP';
+                round++;
+                document.getElementById('round-display').innerText = `ROUND ${round}`;
+                document.getElementById('phase-status').innerText = "MARKET OPEN";
+                btn.innerText = "SKIP SHOP"; btn.classList.add('btn-secondary'); 
+                
+                Object.values(players).forEach(p => {
+                    p.shopReady = false; p.locked = false; p.speed = 0; p.item = null;
+                    const allItems = Object.keys(ITEMS);
+                    for (let i = allItems.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [allItems[i], allItems[j]] = [allItems[j], allItems[i]];
+                    }
+                    p.conn.send({ type: 'SHOP_START', offer: allItems.slice(0, 3) });
+                });
+                updateHostUI(); 
+            } else if (phase === 'SHOP') {
+                phase = 'RACE';
+                const wKeys = Object.keys(WEATHERS);
+                const wKey = wKeys[Math.floor(Math.random() * wKeys.length)];
+                currentWeather = WEATHERS[wKey];
+                document.getElementById('phase-status').innerText = "RACING IN PROGRESS";
+                document.getElementById('host-weather-display').innerText = currentWeather.name;
+                document.getElementById('host-weather-display').style.color = currentWeather.color;
+                btn.innerText = "FORCE CALCULATE"; btn.classList.add('btn-secondary');
+                broadcast({ type: 'RACE_START', weather: currentWeather });
+            } else if (phase === 'RACE') {
+                calculateResults();
+                phase = 'RESULT';
+                document.getElementById('phase-status').innerText = "RESULTS";
+                btn.innerText = "NEXT ROUND"; btn.classList.remove('btn-secondary');
+            }
+        }
+
+        function calculateResults() {
+            let oilVictims = [];
+            const oilUsers = Object.values(players).filter(p => p.item === 'OIL');
+            oilUsers.forEach(u => {
+                const others = Object.values(players).filter(p => p.id !== u.id);
+                if(others.length > 0) oilVictims.push(others[Math.floor(Math.random() * others.length)].id);
+            });
+
+            let leaderboardData = [];
+            Object.values(players).forEach(p => {
+                if(!p.locked) return;
+
+                let s = p.speed; 
+                let finalSpeed = s;
+                let riskIndex = s;
+                let mods = []; 
+
+                // Oil Logic
+                let oilVictim = oilVictims.includes(p.id);
+                if (oilVictim) { finalSpeed = Math.max(1, finalSpeed - 2); riskIndex = Math.max(1, riskIndex - 2); mods.push("OIL(-2)"); }
+
+                // NOS: Adds Speed, BUT Risk Index uses BASE (unmodified) speed
+                if (p.item === 'NOS') { finalSpeed += 2; mods.push("NOS(+2)"); }
+                
+                // ABS: Does NOT change speed. Reduces RISK directly.
+                let absMod = 0;
+                if (p.item === 'ABS') { absMod = 30; mods.push("ABS(-30% RISK)"); }
+
+                // --- RISK CALCULATION ---
+                riskIndex = Math.max(1, Math.min(8, riskIndex));
+                let baseRisk = currentWeather.risks[riskIndex - 1];
+                let tunerBonus = (p.role === 'MECH') ? 15 : 0;
+                if (p.role === 'MECH') mods.push("TUNER(-15%)");
+
+                let finalRisk = Math.max(0, baseRisk - tunerBonus - absMod);
+
+                // --- ROLL & RESOLVE ---
+                let roll = Math.floor(Math.random() * 100);
+                let outcome = (roll < finalRisk) ? "CRASH" : "SAFE";
+
+                if (outcome === "CRASH" && p.role === 'TANK') { outcome = "SAVED"; mods.push("ARMOR"); }
+
+                let pts = finalSpeed * 10;
+                let cashEarned = 0;
+
+                if (p.speed <= 3) cashEarned = 75;
+                else if (p.speed <= 6) cashEarned = 25;
+                else cashEarned = 0;
+
+                if (outcome === "CRASH") {
+                    if (p.item === 'INS') { pts = 50; outcome = "INSURED"; }
+                    else pts = 0;
+                } else {
+                    if (p.role === 'RACE' && finalSpeed >= 8) { pts *= 2; mods.push("SPEEDSTER(2x)"); }
+                    if (p.role === 'DARE' && finalRisk >= 40) { pts += 50; mods.push("DAREDEVIL(+50)"); }
+                }
+
+                p.score += pts;
+                p.credits += cashEarned;
+                
+                let details = `Roll: ${roll} vs Risk ${finalRisk}%. ` + (mods.length > 0 ? `Mods: ${mods.join(', ')}` : "");
+                p.conn.send({ type: 'RESULT', outcome: outcome, score: pts, cash: cashEarned, details: details });
+                
+                leaderboardData.push({ name: p.name, final: finalSpeed, mods: mods.length > 0 ? mods.join(',') : "-", cash: cashEarned, outcome: outcome, pts: pts });
+            });
+            
+            document.getElementById('limit-report').innerText = `WEATHER: ${currentWeather.name}`;
+            renderLeaderboard(leaderboardData);
+        }
+
+        function getOrdinal(n) {
+            var s = ["th", "st", "nd", "rd"];
+            var v = n % 100;
+            return n + (s[(v - 20) % 10] || s[v] || s[0]);
+        }
+
+        function renderLeaderboard(data) {
+            document.getElementById('leaderboard-container').classList.remove('hidden');
+            document.getElementById('player-list').classList.add('hidden');
+            const tbody = document.getElementById('lb-body');
+            tbody.innerHTML = '';
+            data.sort((a,b) => b.pts - a.pts);
+            data.forEach((d, i) => {
+                const tr = document.createElement('tr');
+                let outClass = "";
+                if(d.outcome === 'CRASH') outClass = "lb-row-crash";
+                if(d.outcome === 'SAVED') outClass = "lb-row-win";
+                
+                let rankStr = getOrdinal(i + 1);
+                let rankClass = "lb-rank";
+                if(i === 0) rankClass += " rank-1";
+                if(i === 1) rankClass += " rank-2";
+                if(i === 2) rankClass += " rank-3";
+
+                tr.className = outClass;
+                tr.innerHTML = `<td class="${rankClass}">${rankStr}</td><td class="lb-name">${d.name}</td><td>${d.final}</td><td class="lb-mods">${d.mods}</td><td class="text-gold">$${d.cash}</td><td>${d.pts}</td>`;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function broadcast(msg) { Object.values(players).forEach(p => p.conn.send(msg)); }
+
+        /* --- CLIENT LOGIC --- */
+        let currentSpeed = 0; let selectedItem = null;
+        let clientWeather = null;
+
+        // Rejoin Logic
+        function checkRejoin() {
+            const savedSession = localStorage.getItem('hw_session');
+            if (savedSession) {
+                const sess = JSON.parse(savedSession);
+                if (sess.code && sess.id && sess.role && sess.name) {
+                    document.getElementById('btn-rejoin').classList.remove('hidden');
+                    document.getElementById('rejoin-code').innerText = sess.code;
+                    mySavedId = sess.id;
+                    myRole = sess.role;
+                }
+            }
+        }
+
+        function rejoinGame() {
+            const sess = JSON.parse(localStorage.getItem('hw_session'));
+            document.getElementById('join-code').value = sess.code;
+            document.getElementById('join-name').value = sess.name;
+            connectToHost(true);
+        }
+
+        function showJoinScreen() { 
+            Audio.init(); 
+            switchScreen('join-screen'); 
+            const grid = document.getElementById('role-select'); 
+            grid.innerHTML = ''; 
+            Object.keys(ROLES).forEach(key => { 
+                const r = ROLES[key]; 
+                const btn = document.createElement('div'); 
+                btn.className = 'role-badge'; 
+                btn.style.cursor = 'pointer'; 
+                btn.innerHTML = `<div class="role-icon">${r.icon}</div><div class="role-text"><b>${r.name}</b><br>${r.desc}</div>`; 
+                btn.onclick = () => { 
+                    document.querySelectorAll('#role-select .role-badge').forEach(b => b.style.borderColor = '#444'); 
+                    btn.style.borderColor = 'var(--neon-orange)'; 
+                    myRole = key; 
+                    Audio.beep(600); 
+                }; 
+                grid.appendChild(btn); 
+            }); 
+        }
+
+        function connectToHost(isRejoin = false) { 
+            const code = document.getElementById('join-code').value.toUpperCase(); 
+            const name = document.getElementById('join-name').value; 
+            
+            if (!code || !name || !myRole) { alert("Please fill all fields."); return; } 
+            
+            // If rejoining, use the saved ID. If not, PeerJS generates one automatically, OR we can generate a consistent UUID.
+            // Best practice here: Let PeerJS handle ID unless we need persistence.
+            // To allow persistence, we MUST pass an ID to PeerJS constructor.
+            
+            let peerOptions = {};
+            if (isRejoin && mySavedId) {
+                peer = new Peer(mySavedId);
+            } else {
+                // Generate a new persistent ID manually so we can save it
+                const newId = 'hw-player-' + Math.random().toString(36).substr(2, 9);
+                peer = new Peer(newId);
+                mySavedId = newId;
+            }
+
+            peer.on('open', id => { 
+                conn = peer.connect(APP_ID + code); 
+                
+                // Save Session for Reconnect
+                localStorage.setItem('hw_session', JSON.stringify({
+                    id: id,
+                    code: code,
+                    name: name,
+                    role: myRole
+                }));
+
+                conn.on('open', () => { 
+                    conn.send({ type: 'JOIN', id: id, name: name, role: myRole }); 
+                    switchScreen('client-lobby'); 
+                }); 
+                conn.on('data', handleClientData); 
+                conn.on('error', (err) => alert("Connection Error: " + err));
+            }); 
+            
+            peer.on('error', (err) => {
+                if(err.type === 'unavailable-id') {
+                    // ID taken, likely already connected or ghost connection. 
+                    // Try connecting anyway without re-init peer if possible, or alert user.
+                    alert("Session active. Try restarting browser or wait 10s.");
+                } else {
+                    alert("Network Error: " + err.type);
+                }
+            });
+        }
+
+        function handleClientData(data) {
+            if(data.type === 'WELCOME') { 
+                if (data.isReconnect) {
+                    myCredits = data.credits;
+                    myInventory = data.inventory || [];
+                    document.getElementById('credit-display').innerText = "$" + myCredits;
+                    document.getElementById('inv-display').innerText = myInventory.map(k => ITEMS[k].icon).join(' ');
+                    document.getElementById('lobby-msg').innerText = "Reconnected! Waiting for next phase...";
+                }
+                
+                document.getElementById('active-role-card').innerHTML = `<div class="role-icon">${data.role.icon}</div><div class="role-text"><b class="text-orange">${data.role.name}</b><br>${data.role.desc}</div>`; 
+                if(myRole === 'COP') document.getElementById('cop-radar-panel').classList.remove('hidden'); 
+            }
+            if(data.type === 'SHOP_START') { switchScreen('client-lobby'); document.getElementById('lobby-status').innerText = "WORKSHOP"; document.getElementById('lobby-msg').innerText = ""; document.getElementById('shop-area').classList.remove('hidden'); const box = document.getElementById('shop-options'); box.innerHTML = ''; data.offer.forEach(key => { const item = ITEMS[key]; const div = document.createElement('div'); div.className = 'shop-item'; div.innerHTML = `<div style="display:flex; align-items:center;"><span style="font-size:1.5rem; margin-right:10px;">${item.icon}</span><div><b>${item.name}</b><br><span style="font-size:0.7rem; color:#888;">${item.desc}</span></div></div><div class="text-green">$50</div>`; div.onclick = () => buyItem(key); box.appendChild(div); }); }
+            if(data.type === 'RACE_START') { 
+                switchScreen('client-game'); 
+                clientWeather = data.weather;
+                document.getElementById('forecast-display').innerText = "WEATHER: " + clientWeather.name; 
+                document.getElementById('forecast-display').style.color = clientWeather.color;
+                document.getElementById('cockpit-credits').innerText = "$" + myCredits; 
+                
+                for(let i=0; i<8; i++) {
+                    const r = clientWeather.risks[i];
+                    const badge = document.getElementById(`risk-${i+1}`);
+                    badge.innerText = r + "%";
+                    badge.style.color = (r > 30) ? 'var(--neon-red)' : ((r > 0) ? 'var(--neon-yellow)' : 'var(--neon-green)');
+                }
+
+                setSpeed(0); selectedItem = null; updateModifiersUI(); 
+                if(myRole === 'COP') { document.getElementById('radar-safe').innerText = "0"; document.getElementById('radar-mid').innerText = "0"; document.getElementById('radar-high').innerText = "0"; } 
+            }
+            if(data.type === 'RADAR_UPDATE' && myRole === 'COP') { document.getElementById('radar-safe').innerText = data.counts.SAFE; document.getElementById('radar-mid').innerText = data.counts.MID; document.getElementById('radar-high').innerText = data.counts.HIGH; }
+            if(data.type === 'RESULT') { switchScreen('client-result'); const outcomeMap = { 'SAFE': 'text-green', 'CRASH': 'text-red', 'INSURED': 'text-blue', 'SAVED': 'text-green' }; document.getElementById('res-outcome').innerText = data.outcome; document.getElementById('res-outcome').className = outcomeMap[data.outcome] || 'text-white'; document.getElementById('res-score').innerText = (data.score > 0 ? "+" : "") + data.score + " PTS"; document.getElementById('res-cash').innerText = (data.cash > 0 ? "+" : "") + "$" + data.cash + " CASH"; document.getElementById('res-detail').innerText = `${data.details}`; myCredits += data.cash; document.getElementById('credit-display').innerText = "$" + myCredits; }
+        }
+
+        function buyItem(key) { if(myCredits >= 50) { myCredits -= 50; myInventory.push(key); document.getElementById('inv-display').innerText = myInventory.map(k => ITEMS[k].icon).join(' '); finishShop(); } else { alert("Not enough credits!"); } }
+        function skipShop() { finishShop(); }
+        function finishShop() { document.getElementById('shop-area').classList.add('hidden'); document.getElementById('lobby-status').innerText = "READY"; document.getElementById('lobby-msg').innerText = "Waiting for other drivers..."; document.getElementById('credit-display').innerText = "$" + myCredits; conn.send({ type: 'SHOP_DONE', id: peer.id, inventory: myInventory, credits: myCredits }); }
+
+        function setSpeed(val) {
+            currentSpeed = val; document.getElementById('speed-display').innerText = val;
+            document.querySelectorAll('.speed-btn').forEach(b => { b.classList.remove('selected'); if(parseInt(b.dataset.val) === val) b.classList.add('selected'); });
+            const txt = document.getElementById('risk-text'); const d = document.getElementById('speed-display');
+            if (val === 0) { txt.innerText = "SELECT SPEED"; txt.style.color = "#666"; }
+            else if (val <= 3) { txt.innerText = "DRAFTING (+$75)"; txt.style.color = "#0aff0a"; d.className = "big-stat text-green"; }
+            else if (val <= 6) { txt.innerText = "CRUISING (+$25)"; txt.style.color = "#ffe600"; d.className = "big-stat text-orange"; }
+            else { txt.innerText = "REDLINE (+$0)"; txt.style.color = "#ff003c"; d.className = "big-stat text-red"; }
+            Audio.beep(200 + (val*50), 'sawtooth');
+        }
+
+        function toggleItemMenu() { if(myInventory.length === 0) return; const list = document.getElementById('item-list'); list.innerHTML = ''; myInventory.forEach(key => { const item = ITEMS[key]; const div = document.createElement('div'); div.className = 'reaction-btn'; div.innerHTML = `<b>${item.icon}</b> <div>${item.name}</div>`; div.onclick = () => { selectedItem = key; closeOverlays(); updateModifiersUI(); }; list.appendChild(div); }); document.getElementById('overlay-item').classList.remove('hidden'); }
+        function closeOverlays() { document.querySelectorAll('.modal-overlay').forEach(m => m.classList.add('hidden')); }
+
+        function updateModifiersUI() {
+            const iBtn = document.getElementById('btn-item');
+            if (selectedItem) { iBtn.innerText = ITEMS[selectedItem].name; iBtn.style.background = "var(--neon-blue)"; iBtn.style.color = "black"; } 
+            else { iBtn.innerText = "ITEM: NONE"; iBtn.style.background = ""; iBtn.style.color = "white"; }
+        }
+
+        function commitMove() {
+            if(currentSpeed === 0) { alert("Select a speed!"); return; }
+            conn.send({ type: 'LOCK', id: peer.id, speed: currentSpeed, item: selectedItem });
+            if(selectedItem) { const idx = myInventory.indexOf(selectedItem); if(idx > -1) myInventory.splice(idx, 1); document.getElementById('inv-display').innerText = myInventory.map(k => ITEMS[k].icon).join(' '); }
+            switchScreen('client-lobby'); document.getElementById('lobby-status').innerText = "LOCKED IN"; document.getElementById('lobby-msg').innerText = "Waiting for results...";
+        }
+
+        function backToLobby() { switchScreen('client-lobby'); document.getElementById('lobby-status').innerText = "STANDBY"; document.getElementById('lobby-msg').innerText = "Waiting for next round..."; }
+        function switchScreen(id) { document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden')); document.getElementById(id).classList.remove('hidden'); }
+    </script>
+</body>
+</html>
